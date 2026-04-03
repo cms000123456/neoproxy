@@ -238,11 +238,23 @@ neoproxy/
 
 ## Documentation
 
-- [Authentik Setup Guide](AUTHENTIK-GUIDE.md) - Configure SSO/MFA
-- [Cross-Host Proxying](docs/cross-host-proxying.md) - Detailed networking
-- [NPM Configuration Examples](examples/npm-config-example.md)
-- [Control Panel Options](control-panel/)
-- [High Availability Setup](ha-setup/) - Multi-controller with VRRP failover
+| Document | Description |
+|----------|-------------|
+| [Table of Contents](docs/TABLE_OF_CONTENTS.md) | Navigate all documentation |
+| [Quick Start](docs/QUICKSTART.md) | Get running in 5 minutes |
+| [Prerequisites](docs/PREREQUISITES.md) | System requirements |
+| [Architecture Guide](docs/ARCHITECTURE_GUIDE.md) | Choose your setup |
+| [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) | All config options |
+| [Authentik Setup Guide](AUTHENTIK-GUIDE.md) | Configure SSO/MFA |
+| [Cross-Host Proxying](docs/cross-host-proxying.md) | Detailed networking |
+| [NPM Configuration Examples](examples/npm-config-example.md) | Proxy examples |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues |
+| [Backup & Restore](docs/BACKUP_RESTORE.md) | Data protection |
+| [Security Hardening](docs/SECURITY.md) | Best practices |
+| [Cheat Sheet](docs/CHEATSHEET.md) | Quick commands |
+| [Control Panel Options](control-panel/) | Dashboard setup |
+| [High Availability Setup](ha-setup/) | Multi-controller HA |
+| [Monitoring](monitoring/) | Uptime monitoring with Kuma |
 
 ## Ports
 
