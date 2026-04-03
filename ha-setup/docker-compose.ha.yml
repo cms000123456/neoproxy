@@ -1,0 +1,187 @@
+version: "3.8"
+
+# High Availability NeoProxy Stack
+# Multiple controllers with VRRP failover and shared storage
+
+services:
+  # VRRP/Keepalived for floating IP
+  keepalived:
+    image: osixia/keepalived:2.0.20
+    container_name: keepalived
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BROADCAST
+    network_mode: host
+    environment:
+      - KEEPALIVED_VIRTUAL_IP=${VIRTUAL_IP:-203.0.113.10}
+      - KEEPALIVED_INTERFACE=${INTERFACE:-eth0}
+      - KEEPALIVED_PRIORITY=${PRIORITY:-100}
+      - KEEPALIVED_ROUTER_ID=${ROUTER_ID:-51}
+    volumes:
+      - ./keepalived/keepalived.conf:/usr/local/etc/keepalived/keepalived.conf:ro
+      - ./keepalived/notify.sh:/usr/local/bin/notify.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    sysctls:
+      - net.ipv4.ip_nonlocal_bind=1
+    healthcheck:
+      test: ["CMD", "pgrep", "keepalived"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Nginx Proxy Manager
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    environment:
+      DB_SQLITE_FILE: "/data/database.sqlite"
+      DISABLE_IPV6: "true"
+    volumes:
+      # Shared storage for HA
+      - ${SHARED_DATA_PATH:-./data}/npm:/data
+      - ${SHARED_DATA_PATH:-./data}/letsencrypt:/etc/letsencrypt
+      - ./data/npm/custom_locations:/data/custom_locations:ro
+    networks:
+      - proxy-network
+      - vpn-network
+    depends_on:
+      - authentik-server
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:81"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # PostgreSQL for Authentik (HA with shared storage)
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASS:-changeme}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    networks:
+      - proxy-network
+
+  # Redis for Authentik
+  redis:
+    image: docker.io/library/redis:alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/redis:/data
+    networks:
+      - proxy-network
+
+  # Authentik Server
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:-changeme}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-changeme}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_AVATARS: initials
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/authentik/media:/media
+      - ${SHARED_DATA_PATH:-./data}/authentik/custom-templates:/templates
+      - ${SHARED_DATA_PATH:-./data}/authentik/certs:/certs
+    networks:
+      - proxy-network
+    depends_on:
+      - postgresql
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/-/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # Authentik Worker
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:-changeme}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-changeme}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/authentik/media:/media
+      - ${SHARED_DATA_PATH:-./data}/authentik/certs:/certs
+      - ${SHARED_DATA_PATH:-./data}/authentik/custom-templates:/templates
+    networks:
+      - proxy-network
+    depends_on:
+      - postgresql
+      - redis
+
+  # Nebula Lighthouse (for inter-host connectivity)
+  nebula-lighthouse:
+    image: ghcr.io/slackhq/nebula:latest
+    container_name: nebula-lighthouse
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "4242:4242/udp"
+    volumes:
+      - ./nebula:/config:ro
+    command: -config /config/config.lighthouse.yml
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+    networks:
+      - vpn-network
+      - proxy-network
+    profiles:
+      - hub
+
+networks:
+  proxy-network:
+    name: proxy-network
+    driver: bridge
+  
+  vpn-network:
+    name: vpn-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.8.0.0/24
