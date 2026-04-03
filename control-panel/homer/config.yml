@@ -1,0 +1,140 @@
+# Homer Dashboard Configuration
+# Place this in ./assets/config.yml
+
+title: "NeoProxy Control Center"
+subtitle: "Hub-Spoke Infrastructure Management"
+logo: "logo.png"  # Optional: add your own logo
+
+theme: default
+# Or use "dark", "ocean", "sakura", etc.
+
+columns: "3"  # Number of columns for services
+
+# Optional: Add custom CSS
+custom_css: |
+  body {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+
+# Optional: Add custom JS
+custom_js: |
+  // Auto-refresh status every 30 seconds
+  setInterval(() => {
+    document.querySelectorAll('.status').forEach(el => el.click());
+  }, 30000);
+
+# Header links
+links:
+  - name: "GitHub"
+    icon: "fab fa-github"
+    url: "https://github.com/cms000123456/neoproxy"
+    target: "_blank"
+  - name: "Documentation"
+    icon: "fas fa-book"
+    url: "https://github.com/cms000123456/neoproxy/blob/main/README.md"
+    target: "_blank"
+
+# Service categories
+services:
+  - name: "🌐 Proxy & Access"
+    icon: "fas fa-globe"
+    items:
+      - name: "Nginx Proxy Manager"
+        logo: "https://nginxproxymanager.com/icon.png"
+        subtitle: "Reverse proxy management"
+        tag: "admin"
+        keywords: "npm proxy ssl"
+        url: "http://npm:81"  # Internal Docker network
+        target: "_blank"
+        # Or use external URL after setup
+        # url: "https://npm.yourdomain.com"
+
+      - name: "Authentik"
+        logo: "https://goauthentik.io/img/icon.png"
+        subtitle: "Identity & SSO"
+        tag: "auth"
+        keywords: "sso mfa users"
+        url: "http://authentik-server:9000"
+        target: "_blank"
+
+  - name: "🔐 Security"
+    icon: "fas fa-shield-alt"
+    items:
+      - name: "Authentik Admin"
+        logo: "https://goauthentik.io/img/icon.png"
+        subtitle: "User management, MFA setup"
+        tag: "admin"
+        url: "http://authentik-server:9000/if/admin/"
+        target: "_blank"
+
+      - name: "SSL Certificates"
+        logo: "fas fa-certificate"
+        subtitle: "Manage Let's Encrypt certs"
+        tag: "admin"
+        url: "http://npm:81/nginx/certificates"
+        target: "_blank"
+
+  - name: "🖥️ Infrastructure"
+    icon: "fas fa-server"
+    items:
+      - name: "Nebula Status"
+        logo: "fas fa-network-wired"
+        subtitle: "VPN connection status"
+        tag: "system"
+        url: "#"
+        # Could link to a custom status page
+        
+      - name: "Portainer"
+        logo: "https://portainer.io/images/logo.png"
+        subtitle: "Docker management"
+        tag: "docker"
+        url: "http://portainer:9000"  # If using Portainer
+        target: "_blank"
+
+  - name: "📊 Monitoring"
+    icon: "fas fa-chart-line"
+    items:
+      - name: "Consul UI"
+        logo: "https://www.consul.io/img/logo.svg"
+        subtitle: "Service discovery & DNS"
+        tag: "system"
+        url: "http://consul-server:8500"
+        target: "_blank"
+        # Only if using Consul
+
+      - name: "System Status"
+        logo: "fas fa-heartbeat"
+        subtitle: "Hub & spoke health"
+        tag: "system"
+        url: "#status"
+        # Could link to custom health check endpoint
+
+  - name: "🔗 Quick Links"
+    icon: "fas fa-link"
+    items:
+      - name: "NPM Proxy Hosts"
+        logo: "fas fa-list"
+        subtitle: "Manage proxy hosts"
+        tag: "quick"
+        url: "http://npm:81/nginx/proxy"
+        target: "_blank"
+
+      - name: "Authentik Apps"
+        logo: "fas fa-th-large"
+        subtitle: "Configure applications"
+        tag: "quick"
+        url: "http://authentik-server:9000/if/admin/#/core/applications"
+        target: "_blank"
+
+      - name: "Documentation"
+        logo: "fas fa-book-open"
+        subtitle: "Setup guides"
+        tag: "quick"
+        url: "https://github.com/cms000123456/neoproxy/blob/main/README.md"
+        target: "_blank"
+
+# Optional: Message banner
+message:
+  style: "is-info"
+  title: "👋 Welcome"
+  content: "This is your NeoProxy control center. Access all services from one place."

@@ -1,7 +1,10 @@
 version: "3.8"
 
+# NeoProxy Stack - Nginx Proxy Manager + Authentik + Inter-Host VPN
+# This stack acts as a HUB that can accept connections from remote SPOKE hosts
+
 services:
-  # Nginx Proxy Manager
+  # Nginx Proxy Manager - Reverse proxy with web UI
   npm:
     image: jc21/nginx-proxy-manager:latest
     container_name: npm
@@ -19,6 +22,7 @@ services:
       - ./data/npm/custom_locations:/data/custom_locations:ro
     networks:
       - proxy-network
+      - vpn-network  # Can reach remote hosts via VPN
     depends_on:
       - authentik-server
 
@@ -73,7 +77,6 @@ services:
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-changeme}
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
       AUTHENTIK_AVATARS: initials
-      # AUTHENTIK_LOG_LEVEL: debug
     volumes:
       - ./data/authentik/media:/media
       - ./data/authentik/custom-templates:/templates
@@ -83,10 +86,6 @@ services:
     depends_on:
       - postgresql
       - redis
-    labels:
-      # NPM labels for automatic proxy (optional, manual config recommended)
-      - "npm.proxy=true"
-      - "npm.domain=auth.yourdomain.com"
 
   # Authentik Worker (Background tasks)
   authentik-worker:
@@ -112,21 +111,53 @@ services:
       - postgresql
       - redis
 
-  # Optional: Outpost for LDAP (if needed)
-  # authentik-ldap:
-  #   image: ghcr.io/goauthentik/ldap:2024.12
-  #   container_name: authentik-ldap
-  #   restart: unless-stopped
-  #   ports:
-  #     - "389:3389"
-  #     - "636:6636"
-  #   environment:
-  #     AUTHENTIK_HOST: http://authentik-server:9000
-  #     AUTHENTIK_TOKEN: ${OUTPOST_TOKEN}
-  #   networks:
-  #     - proxy-network
+  # ========================================================================
+  # INTER-HOST CONNECTIVITY - Nebula VPN Lighthouse
+  # This allows remote Docker hosts (spokes) to connect securely
+  # ========================================================================
+  
+  nebula-lighthouse:
+    image: ghcr.io/slackhq/nebula:latest
+    container_name: nebula-lighthouse
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "4242:4242/udp"  # Nebula communication port
+    volumes:
+      - ./nebula:/config:ro
+    command: -config /config/config.lighthouse.yml
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+    networks:
+      - vpn-network
+      - proxy-network
+    profiles:
+      - hub  # Only start when explicitly enabling hub mode
+
+  # Optional: Control Panel (Homer dashboard)
+  control-panel:
+    image: b4bz/homer:latest
+    container_name: control-panel
+    restart: unless-stopped
+    volumes:
+      - ./control-panel/homer/assets:/www/assets
+    networks:
+      - proxy-network
+    profiles:
+      - panel  # Optional component
 
 networks:
   proxy-network:
     name: proxy-network
     driver: bridge
+  
+  vpn-network:
+    name: vpn-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.8.0.0/24

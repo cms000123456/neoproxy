@@ -1,0 +1,63 @@
+version: "3.8"
+
+# NeoProxy SPOKE - Remote host that connects to the HUB
+# Copy this to remote hosts and customize the subnet
+
+services:
+  # Nebula VPN Client - Connects to hub
+  nebula:
+    image: ghcr.io/slackhq/nebula:latest
+    container_name: nebula
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./nebula:/config:ro
+    command: -config /config/config.yml
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+    networks:
+      - vpn-network
+      - app-network
+    # Routes traffic between VPN and app network
+
+  # Example applications - replace with your services
+  # These are accessible from the HUB via their container IPs
+  
+  whoami:
+    image: traefik/whoami:latest
+    container_name: whoami
+    restart: unless-stopped
+    networks:
+      - app-network
+    # NO ports exposed - accessible only via VPN!
+    # NPM on hub can proxy to http://<container-ip>:80
+
+  # Add your own services here:
+  # webapp:
+  #   image: your-app:latest
+  #   networks:
+  #     - app-network
+  #   # Accessible from hub at http://<ip>:<port>
+
+networks:
+  # Application network - ISOLATED per spoke
+  # Use unique subnets for each spoke:
+  # Spoke 1: 172.20.0.0/16
+  # Spoke 2: 172.21.0.0/16
+  # Spoke 3: 172.22.0.0/16
+  app-network:
+    name: app-network
+    driver: bridge
+    ipam:
+      config:
+        # CHANGE THIS for each spoke!
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+  vpn-network:
+    name: vpn-network
+    driver: bridge

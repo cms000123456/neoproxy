@@ -1,303 +1,233 @@
-# NeoProxy - Nginx Proxy Manager with Authentik SSO/MFA
+# NeoProxy
 
-A complete reverse proxy solution with authentication and multi-factor authentication (MFA) support using Nginx Proxy Manager and Authentik.
+Nginx Proxy Manager + Authentik SSO/MFA with secure inter-host container networking.
+
+```
+                                    Internet
+                                       │
+                                       ▼
+                            ┌──────────────────────┐
+                            │   HUB (This Stack)   │
+                            │  ┌────────────────┐  │
+                            │  │      NPM       │  │◄── Public entry
+                            │  │   (80/443/81)  │  │
+                            │  └───────┬────────┘  │
+                            │  ┌───────▼────────┐  │
+                            │  │   Authentik    │  │
+                            │  └───────┬────────┘  │
+                            │  ┌───────▼────────┐  │
+                            │  │Nebula Lighthouse │ │◄── VPN Coordinator
+                            │  │   (10.8.0.1)   │  │
+                            └──┬───────┬───────────┘
+                               │       │
+              ┌────────────────┘       └────────────────┐
+              │         Encrypted VPN Tunnels           │
+              ▼                                         ▼
+    ┌───────────────────┐                    ┌───────────────────┐
+    │   SPOKE Host 1    │                    │   SPOKE Host 2    │
+    │ 172.20.0.0/16     │                    │ 172.21.0.0/16     │
+    │ ┌─────────────┐   │                    │ ┌─────────────┐   │
+    │ │  Container  │   │                    │ │  Container  │   │
+    │ │   :8080     │   │                    │ │   :8080     │   │
+    │ └─────────────┘   │                    │ └─────────────┘   │
+    │ (no public ports!)│                    │ (no public ports!)│
+    └───────────────────┘                    └───────────────────┘
+```
 
 ## Features
 
-- 🚀 **Nginx Proxy Manager** - Easy-to-use web UI for reverse proxy management
-- 🔐 **Authentik Identity Provider** - Enterprise-grade authentication & authorization
-- 🔢 **Multi-Factor Authentication** - TOTP, WebAuthn, SMS, and more
-- 📱 **User Portal** - Centralized application dashboard for users
-- 📝 **Application Proxy** - Protect any app behind SSO
-- 🔄 **Automatic SSL** - Let's Encrypt integration
-- 👥 **Group/Role Management** - Granular access control
-
-## Architecture
-
-```
-┌─────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│   Client    │─────▶│  Nginx Proxy    │─────▶│  Authentik      │
-│             │      │  Manager (NPM)  │      │  (Auth Portal)  │
-└─────────────┘      └─────────────────┘      └─────────────────┘
-                              │
-                              ▼
-                       ┌─────────────────┐
-                       │  Protected      │
-                       │  Applications   │
-                       └─────────────────┘
-```
+- 🚀 **Nginx Proxy Manager** - Easy reverse proxy management
+- 🔐 **Authentik** - SSO, MFA, user management
+- 🌐 **Inter-Host Networking** - Connect multiple Docker hosts securely
+- 🔒 **No Public Exposure** - Remote containers accessible only via VPN
+- 📊 **Control Panel** - Unified dashboard for all services
+- 🔄 **Same Ports Everywhere** - Each host can use the same ports (8080, 5432, etc.)
 
 ## Quick Start
 
-### 1. Prerequisites
-
-- Docker & Docker Compose installed
-- Ports 80, 443, and 81 available
-- A domain name (for production)
-
-### 2. Initial Setup
+### 1. Clone and Setup
 
 ```bash
-# Clone/setup this directory
+git clone git@github.com:cms000123456/neoproxy.git
 cd neoproxy
-
-# Generate secure secrets
 ./setup.sh
-
-# Or manually update .env file with secure values:
-# - PG_PASS: PostgreSQL password
-# - AUTHENTIK_SECRET_KEY: 50+ character random string
 ```
 
-### 3. Start Services
+### 2. Choose Mode
+
+The setup script offers three modes:
+
+| Mode | Use Case |
+|------|----------|
+| **Standalone** | Single host with NPM + Authentik |
+| **Hub** | Main proxy that accepts connections from remote hosts |
+| **Spoke** | Remote host that connects to a hub |
+
+### 3. Hub Setup (Main Host)
 
 ```bash
-docker compose up -d
+./setup.sh
+# Select option 2 (Hub)
 ```
 
-### 4. Initial Configuration
+This starts:
+- NPM on ports 80/443/81
+- Authentik on port 9000
+- Nebula lighthouse on port 4242/UDP
 
-1. **Access NPM Admin**: http://localhost:81
-   - Default login: `admin@example.com` / `changeme`
-   - Change password immediately
-
-2. **Access Authentik**: http://localhost:9000 (or via NPM proxy)
-   - First-time setup: create admin account
-   - Configure your domain in System > Brands
-
-### 5. Configure Authentik Provider
-
-1. In Authentik Admin, go to **Applications > Providers**
-2. Create a **Proxy Provider**
-   - Name: `NPM Forward Auth`
-   - Authorization flow: `default-provider-authorization-implicit-consent`
-   - Internal host: `http://npm:81`
-   - External host: `https://apps.yourdomain.com`
-
-3. Create an **Application**
-   - Name: `Protected Apps`
-   - Provider: Select the one you just created
-
-### 6. Configure NPM Proxy Host with Auth
-
-1. In NPM, create a Proxy Host:
-   - Domain Names: `app.yourdomain.com`
-   - Forward Hostname/IP: `your-backend-app`
-   - Forward Port: `8080` (or app port)
-   - Enable SSL (Let's Encrypt)
-
-2. In the **Advanced** tab, paste the content from:
-   ```
-   ./data/npm/custom_locations/authentik_forward.conf
-   ```
-
-3. Save and test
-
-## MFA Configuration
-
-### Available MFA Methods
-
-1. **TOTP (Time-based One-Time Password)**
-   - Google Authenticator, Authy, Bitwarden, etc.
-   
-2. **WebAuthn/FIDO2**
-   - YubiKey, Touch ID, Windows Hello
-   
-3. **SMS (via Twilio)**
-   - Requires Twilio configuration
-
-4. **Email OTP**
-   - Requires email provider setup
-
-### Enabling MFA
-
-1. User logs into Authentik
-2. Go to **Settings > MFA**
-3. Add authenticator method
-4. Follow setup wizard
-
-### Enforcing MFA (Recommended)
-
-1. In Authentik, go to **Flows & Stages**
-2. Edit the `default-authentication-flow`
-3. Add a **Authenticator Validation Stage**
-4. Configure device classes required
-
-## Protecting Applications
-
-### Method 1: Forward Auth (Recommended)
-
-Applications authenticate through Authentik transparently. Users see:
-1. Access app URL
-2. Redirect to Authentik login if not authenticated
-3. MFA prompt (if configured)
-4. Redirect back to app (now logged in)
-
-### Method 2: Proxy Provider with Outpost
-
-For applications supporting headers:
-```nginx
-# Headers passed to backend:
-X-authentik-username: john.doe
-X-authentik-email: john@example.com
-X-authentik-groups: admins,users
-X-authentik-uid: abc123
-```
-
-### Method 3: OAuth/OIDC
-
-For apps with native SSO support:
-- Configure Authentik as OIDC provider
-- Use standard OAuth2/OIDC flow
-
-## Configuration Files
-
-| File | Description |
-|------|-------------|
-| `docker-compose.yml` | All services configuration |
-| `.env` | Environment variables (secrets) |
-| `data/npm/custom_locations/authentik_forward.conf` | Standard auth forwarding |
-| `data/npm/custom_locations/authentik_forward_strict.conf` | Enhanced security mode |
-
-## Security Best Practices
-
-1. **Change Default Passwords** - Immediately after first login
-2. **Use Strong Secrets** - Run `./setup.sh` to generate
-3. **Enable MFA for Admin** - Protect your admin accounts
-4. **Use Strict Mode** - For sensitive applications
-5. **Regular Updates** - Keep images updated
-6. **Backup Data** - Regular backups of `./data`
-7. **Use HTTPS** - Always use SSL in production
-
-## Backup & Restore
-
-### Backup
+### 4. Generate Spoke Configs
 
 ```bash
-# Stop services
-docker compose down
-
-# Backup data directory
-tar -czvf neoproxy-backup-$(date +%Y%m%d).tar.gz ./data
-
-# Restart
-docker compose up -d
+# Generate config for each remote host
+./generate-spoke.sh host1 172.20.0.0/16 10.8.0.2
+./generate-spoke.sh host2 172.21.0.0/16 10.8.0.3
+./generate-spoke.sh host3 172.22.0.0/16 10.8.0.4
 ```
 
-### Restore
+### 5. Deploy Spokes
 
 ```bash
-# Stop services
-docker compose down
+# Copy to remote host
+scp -r spokes/host1 user@remote-host:/opt/neoproxy/
 
-# Restore data
-rm -rf ./data
-tar -xzvf neoproxy-backup-20240101.tar.gz
-
-# Restart
-docker compose up -d
+# On remote host
+ssh user@remote-host
+cd /opt/neoproxy
+./setup.sh
+# Select option 3 (Spoke)
 ```
 
-## Troubleshooting
+### 6. Configure NPM
 
-### Authentik not accessible
+In NPM, proxy to remote container IPs:
+
+| Domain | Forward IP | Port | Notes |
+|--------|------------|------|-------|
+| `app1.yourdomain.com` | `172.20.0.2` | `8080` | Host 1 - no public exposure! |
+| `app2.yourdomain.com` | `172.21.0.2` | `8080` | Host 2 - same port, different IP! |
+
+## Architecture
+
+### Hub (Main Host)
+
+```yaml
+# docker-compose.yml
+services:
+  npm:              # Reverse proxy
+  authentik-server: # Authentication
+  authentik-worker: # Background tasks
+  nebula-lighthouse:# VPN coordinator
+```
+
+### Spoke (Remote Host)
+
+```yaml
+# docker-compose.spoke.yml
+services:
+  nebula:           # VPN client (connects to hub)
+  your-apps:        # Your containers (no ports exposed!)
+```
+
+## Network Isolation
+
+Each spoke gets its own isolated Docker network:
+
+```
+Spoke 1: 172.20.0.0/16
+  ├─ Container A: 172.20.0.2
+  ├─ Container B: 172.20.0.3
+  └─ Container C: 172.20.0.4
+
+Spoke 2: 172.21.0.0/16
+  ├─ Container A: 172.21.0.2  (same service, different network!)
+  ├─ Container B: 172.21.0.3
+  └─ Container C: 172.21.0.4
+```
+
+All accessible from the hub through encrypted VPN tunnels!
+
+## Control Panel
+
+Optional unified dashboard:
 
 ```bash
-# Check logs
-docker compose logs -f authentik-server
-
-# Verify database connection
-docker compose exec authentik-server ak healthcheck
+# Start with control panel
+docker compose --profile hub --profile panel up -d
 ```
 
-### Auth forwarding not working
+Access at `http://localhost:8080` (or proxy through NPM)
 
-1. Check Authentik outpost is running
-2. Verify NPM can reach Authentik: `docker compose exec npm ping authentik-server`
-3. Check custom location configuration
-4. Verify Provider URL matches external host
+## Commands
 
-### SSL certificate issues
+```bash
+# Start hub
+docker compose --profile hub up -d
 
-1. Ensure port 80 is publicly accessible
-2. Check DNS A record points to server
-3. Verify in NPM: `SSL Certificates > Add`
+# Start spoke
+docker compose -f docker-compose.spoke.yml up -d
 
-## Advanced Configuration
+# View status
+docker compose ps
 
-### Custom Branding
+# Check VPN status
+docker compose exec nebula-lighthouse nebula-cert sign -list
 
-Edit `./data/authentik/custom-templates/` and mount to container.
+# Generate new spoke
+./generate-spoke.sh <name> <subnet> <ip>
 
-### LDAP Integration
+# View logs
+docker compose logs -f
+```
 
-Uncomment the `authentik-ldap` service in `docker-compose.yml`.
+## Security
 
-### Radius Support
+- 🔐 All inter-host traffic encrypted via Nebula (WireGuard-based)
+- 🛡️ Remote containers have **no exposed ports** - only accessible via VPN
+- 🔑 Certificate-based authentication for VPN
+- 🔒 Authentik provides SSO/MFA for web applications
+- 📝 Audit logging via Authentik
 
-Add the Radius outpost service for network device authentication.
+## File Structure
 
-### Email Configuration
+```
+neoproxy/
+├── docker-compose.yml           # Hub stack
+├── docker-compose.spoke.yml     # Spoke stack
+├── setup.sh                     # Interactive setup
+├── generate-spoke.sh            # Generate spoke configs
+├── nebula/                      # VPN certificates & configs
+│   ├── ca.crt                   # CA certificate
+│   ├── config.lighthouse.yml    # Hub VPN config
+│   └── config.spoke.yml         # Spoke VPN config template
+├── spokes/                      # Generated spoke packages
+│   ├── host1/
+│   ├── host2/
+│   └── ...
+├── data/                        # Persistent data
+│   ├── npm/
+│   ├── authentik/
+│   └── ...
+├── control-panel/               # Optional dashboard
+└── docs/                        # Documentation
+```
 
-Edit `.env` with SMTP settings for password resets and notifications.
+## Documentation
 
-## Ports Reference
+- [Authentik Setup Guide](AUTHENTIK-GUIDE.md) - Configure SSO/MFA
+- [Cross-Host Proxying](docs/cross-host-proxying.md) - Detailed networking
+- [NPM Configuration Examples](examples/npm-config-example.md)
+- [Control Panel Options](control-panel/)
+
+## Ports
 
 | Port | Service | Description |
 |------|---------|-------------|
 | 80 | NPM | HTTP traffic |
 | 443 | NPM | HTTPS traffic |
 | 81 | NPM | Admin UI |
+| 4242/UDP | Nebula | VPN communication |
 | 9000 | Authentik | Auth server (internal) |
-
-## Hub-and-Spoke Multi-Host Architecture
-
-For proxying containers across multiple Docker hosts securely:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         HUB (Main Host)                      │
-│  ┌─────────┐    ┌──────────┐    ┌──────────────────────┐   │
-│  │   NPM   │◄──►│Authentik │◄──►│  Nebula Lighthouse   │   │
-│  │(Public) │    │   (MFA)  │    │     (VPN)            │   │
-│  └────┬────┘    └──────────┘    └──────────┬───────────┘   │
-│       │                                     │                │
-│       └─────────────────────────────────────┘                │
-│                         │                                   │
-└─────────────────────────┼───────────────────────────────────┘
-                          │ VPN Tunnels (encrypted)
-          ┌───────────────┼───────────────┐
-          │               │               │
-          ▼               ▼               ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│   Spoke Host 1  │ │   Spoke Host 2  │ │   Spoke Host 3  │
-│ 172.20.0.0/16   │ │ 172.21.0.0/16   │ │ 172.22.0.0/16   │
-│ ┌─────────────┐ │ │ ┌─────────────┐ │ │ ┌─────────────┐ │
-│ │  Container A│ │ │ │  Container A│ │ │ │  Container A│ │
-│ │   :8080     │ │ │ │   :8080     │ │ │ │   :8080     │ │
-│ └─────────────┘ │ │ └─────────────┘ │ │ └─────────────┘ │
-│ ┌─────────────┐ │ │ ┌─────────────┐ │ │ ┌─────────────┐ │
-│ │  Container B│ │ │ │  Container B│ │ │ │  Container B│ │
-│ │   :5432     │ │ │ │   :5432     │ │ │ │   :5432     │ │
-│ └─────────────┘ │ │ └─────────────┘ │ │ └─────────────┘ │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
-     No ports exposed!    No ports exposed!    No ports exposed!
-```
-
-**Features:**
-- Each spoke has isolated Docker networks
-- Same ports can be used on every host (8080, 5432, etc.)
-- No public exposure - containers accessible only via VPN
-- NPM on hub proxies to container IPs through encrypted tunnels
-
-See [`hub-spoke/`](./hub-spoke/) directory for complete setup.
-
-## Resources
-
-- [Nginx Proxy Manager Docs](https://nginxproxymanager.com/guide/)
-- [Authentik Documentation](https://docs.goauthentik.io/)
-- [Authentik GitHub](https://github.com/goauthentik/authentik)
 
 ## License
 
-This configuration is provided as-is for your own infrastructure setup.
+MIT - See repository for details.
