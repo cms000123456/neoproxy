@@ -187,6 +187,35 @@ docker compose logs -f
 - 🔒 Authentik provides SSO/MFA for web applications
 - 📝 Audit logging via Authentik
 
+## High Availability (Optional)
+
+For production deployments, run multiple controllers with automatic failover:
+
+```
+                       Internet
+                          │
+              ┌───────────┴───────────┐
+              │   VRRP/Keepalived      │
+              │   Floating IP          │
+              └───────────┬───────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+   ┌────────────┐  ┌────────────┐  ┌────────────┐
+   │Controller 1│  │Controller 2│  │Controller 3│
+   │  (MASTER)  │  │  (BACKUP)  │  │  (BACKUP)  │
+   └──────┬─────┘  └──────┬─────┘  └──────┬─────┘
+          │               │               │
+          └───────────────┼───────────────┘
+                          │
+                 ┌────────▼────────┐
+                 │  Shared Storage │
+                 │ (GlusterFS/DRBD)│
+                 └─────────────────┘
+```
+
+See [ha-setup/](ha-setup/) for complete HA configuration.
+
 ## File Structure
 
 ```
@@ -196,17 +225,13 @@ neoproxy/
 ├── setup.sh                     # Interactive setup
 ├── generate-spoke.sh            # Generate spoke configs
 ├── nebula/                      # VPN certificates & configs
-│   ├── ca.crt                   # CA certificate
-│   ├── config.lighthouse.yml    # Hub VPN config
-│   └── config.spoke.yml         # Spoke VPN config template
+├── ha-setup/                    # High Availability setup
+│   ├── docker-compose.ha.yml
+│   ├── keepalived/              # VRRP configuration
+│   ├── gluster/                 # Shared storage
+│   └── setup-ha.sh
 ├── spokes/                      # Generated spoke packages
-│   ├── host1/
-│   ├── host2/
-│   └── ...
 ├── data/                        # Persistent data
-│   ├── npm/
-│   ├── authentik/
-│   └── ...
 ├── control-panel/               # Optional dashboard
 └── docs/                        # Documentation
 ```
@@ -217,6 +242,7 @@ neoproxy/
 - [Cross-Host Proxying](docs/cross-host-proxying.md) - Detailed networking
 - [NPM Configuration Examples](examples/npm-config-example.md)
 - [Control Panel Options](control-panel/)
+- [High Availability Setup](ha-setup/) - Multi-controller with VRRP failover
 
 ## Ports
 
