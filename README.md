@@ -245,7 +245,7 @@ neoproxy/
 | [Prerequisites](docs/PREREQUISITES.md) | System requirements |
 | [Architecture Guide](docs/ARCHITECTURE_GUIDE.md) | Choose your setup |
 | [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) | All config options |
-| [Authentik Setup Guide](AUTHENTIK-GUIDE.md) | Configure SSO/MFA |
+| [Authentik Setup Guide](docs/AUTHENTIK-GUIDE.md) | Configure SSO/MFA |
 | [Cross-Host Proxying](docs/cross-host-proxying.md) | Detailed networking |
 | [NPM Configuration Examples](examples/npm-config-example.md) | Proxy examples |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues |

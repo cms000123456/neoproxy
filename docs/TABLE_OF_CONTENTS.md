@@ -16,7 +16,7 @@ Complete guide for setting up and managing your secure reverse proxy infrastruct
 |----------|-------------|
 | [Environment Variables](ENVIRONMENT_VARIABLES.md) | All configuration options |
 | [Architecture Guide](ARCHITECTURE_GUIDE.md) | Choose the right setup for your needs |
-| [Authentik Setup Guide](../AUTHENTIK-GUIDE.md) | Configure SSO/MFA |
+| [Authentik Setup Guide](AUTHENTIK-GUIDE.md) | Configure SSO/MFA |
 | [NPM Configuration Examples](../examples/npm-config-example.md) | Proxy host configurations |
 
 ## 🌐 Networking
