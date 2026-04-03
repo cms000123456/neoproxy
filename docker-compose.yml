@@ -1,0 +1,132 @@
+version: "3.8"
+
+services:
+  # Nginx Proxy Manager
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"  # Admin UI
+    environment:
+      DB_SQLITE_FILE: "/data/database.sqlite"
+      DISABLE_IPV6: "true"
+    volumes:
+      - ./data/npm:/data
+      - ./data/letsencrypt:/etc/letsencrypt
+      - ./data/npm/custom_locations:/data/custom_locations:ro
+    networks:
+      - proxy-network
+    depends_on:
+      - authentik-server
+
+  # PostgreSQL for Authentik
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - ./data/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASS:-changeme}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    networks:
+      - proxy-network
+
+  # Redis for Authentik
+  redis:
+    image: docker.io/library/redis:alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - proxy-network
+
+  # Authentik Server (Web UI & API)
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:-changeme}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-changeme}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_AVATARS: initials
+      # AUTHENTIK_LOG_LEVEL: debug
+    volumes:
+      - ./data/authentik/media:/media
+      - ./data/authentik/custom-templates:/templates
+      - ./data/authentik/certs:/certs
+    networks:
+      - proxy-network
+    depends_on:
+      - postgresql
+      - redis
+    labels:
+      # NPM labels for automatic proxy (optional, manual config recommended)
+      - "npm.proxy=true"
+      - "npm.domain=auth.yourdomain.com"
+
+  # Authentik Worker (Background tasks)
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:-changeme}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-changeme}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - ./data/authentik/media:/media
+      - ./data/authentik/certs:/certs
+      - ./data/authentik/custom-templates:/templates
+    networks:
+      - proxy-network
+    depends_on:
+      - postgresql
+      - redis
+
+  # Optional: Outpost for LDAP (if needed)
+  # authentik-ldap:
+  #   image: ghcr.io/goauthentik/ldap:2024.12
+  #   container_name: authentik-ldap
+  #   restart: unless-stopped
+  #   ports:
+  #     - "389:3389"
+  #     - "636:6636"
+  #   environment:
+  #     AUTHENTIK_HOST: http://authentik-server:9000
+  #     AUTHENTIK_TOKEN: ${OUTPOST_TOKEN}
+  #   networks:
+  #     - proxy-network
+
+networks:
+  proxy-network:
+    name: proxy-network
+    driver: bridge

@@ -1,0 +1,75 @@
+version: "3.8"
+
+# HUB with Consul Server for DNS-based service discovery
+
+services:
+  # NPM - uses Consul DNS for container resolution
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    environment:
+      DB_SQLITE_FILE: "/data/database.sqlite"
+    volumes:
+      - ../../data/npm:/data
+      - ../../data/letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy-network
+      - consul-network
+    dns:
+      - 10.8.0.1  # Use Consul DNS
+    depends_on:
+      - consul-server
+
+  # Consul Server - DNS and service registry
+  consul-server:
+    image: hashicorp/consul:latest
+    container_name: consul-server
+    restart: unless-stopped
+    command: >
+      consul agent -server -bootstrap-expect=1 -ui 
+      -client=0.0.0.0 
+      -bind='{{ GetInterfaceIP "eth0" }}'
+      -retry-join=10.8.0.1
+      -datacenter=hub-spoke
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    volumes:
+      - ./consul/data:/consul/data
+    ports:
+      - "8500:8500"   # UI
+      - "8600:8600/tcp"  # DNS
+      - "8600:8600/udp"  # DNS
+    networks:
+      - consul-network
+      - nebula-net
+
+  # Authentik (existing config)
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+    networks:
+      - proxy-network
+    # ... rest of config
+
+  # Nebula Lighthouse
+  nebula-lighthouse:
+    image: ghcr.io/slackhq/nebula:latest
+    # ... existing config
+    networks:
+      - nebula-net
+
+networks:
+  proxy-network:
+    name: proxy-network
+  consul-network:
+    name: consul-network
+  nebula-net:
+    name: nebula-net
+    external: true

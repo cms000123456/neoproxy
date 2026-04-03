@@ -1,0 +1,80 @@
+version: "3.8"
+
+# SPOKE with Consul Client + Registrator for auto service discovery
+
+services:
+  # Consul Client - connects to hub
+  consul-client:
+    image: hashicorp/consul:latest
+    container_name: consul-client
+    restart: unless-stopped
+    command: >
+      consul agent 
+      -client=0.0.0.0
+      -bind='{{ GetInterfaceIP "eth0" }}'
+      -retry-join=10.8.0.1
+      -datacenter=hub-spoke
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    volumes:
+      - ./consul/data:/consul/data
+    networks:
+      - consul-network
+      - nebula-net
+      - app-network
+
+  # Registrator - automatically registers containers with Consul
+  registrator:
+    image: gliderlabs/registrator:latest
+    container_name: registrator
+    restart: unless-stopped
+    command: >
+      -internal
+      -ip=${HOST_IP:-172.20.0.1}
+      consul://consul-client:8500
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    networks:
+      - consul-network
+    depends_on:
+      - consul-client
+
+  # Nebula VPN
+  nebula:
+    image: ghcr.io/slackhq/nebula:latest
+    # ... config
+    networks:
+      - nebula-net
+
+  # Your applications - automatically registered!
+  whoami:
+    image: traefik/whoami:latest
+    container_name: whoami
+    networks:
+      - app-network
+    environment:
+      - SERVICE_NAME=whoami  # Registers as 'whoami'
+      - SERVICE_TAGS=web,spoke1
+    # Registrator automatically creates DNS: whoami.service.consul -> container IP
+
+  webapp:
+    image: nginx:alpine
+    container_name: webapp
+    networks:
+      - app-network
+    environment:
+      - SERVICE_NAME=webapp
+      - SERVICE_TAGS=web,spoke1
+    # Accessible as: webapp.service.consul
+
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  consul-network:
+    name: consul-network
+  nebula-net:
+    name: nebula-net

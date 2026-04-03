@@ -1,0 +1,73 @@
+# Docker Compose Override - Copy to docker-compose.override.yml and customize
+# This file extends docker-compose.yml with local modifications
+
+version: "3.8"
+
+services:
+  npm:
+    # Use specific version instead of latest
+    # image: jc21/nginx-proxy-manager:2.11.1
+    
+    # Additional ports for specific needs
+    # ports:
+    #   - "8080:8080"  # Custom port
+    
+    # Mount custom nginx configs
+    # volumes:
+    #   - ./custom/nginx.conf:/etc/nginx/nginx.conf:ro
+    
+    # Resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.50'
+    #       memory: 512M
+
+  authentik-server:
+    # Use specific version
+    # image: ghcr.io/goauthentik/server:2024.10.5
+    
+    # Additional environment variables
+    environment:
+      # Email configuration
+      # AUTHENTIK_EMAIL__HOST: smtp.gmail.com
+      # AUTHENTIK_EMAIL__PORT: 587
+      # AUTHENTIK_EMAIL__USERNAME: noreply@yourdomain.com
+      # AUTHENTIK_EMAIL__PASSWORD: your_app_password
+      # AUTHENTIK_EMAIL__USE_TLS: "true"
+      # AUTHENTIK_EMAIL__FROM: Authentik <noreply@yourdomain.com>
+      
+      # GeoIP for location-based policies (optional)
+      # AUTHENTIK_GEOIP: "/geoip/GeoLite2-City.mmdb"
+      
+      # Session configuration
+      AUTHENTIK_SESSION__cookie_domain: "yourdomain.com"
+      
+      # LDAP Integration
+      # AUTHENTIK_LDAP__ENABLED: "true"
+      
+      # Logging
+      # AUTHENTIK_LOG_LEVEL: debug
+    
+    # Mount GeoIP database
+    # volumes:
+    #   - ./geoip:/geoip:ro
+    
+    # Expose port directly (if not using NPM)
+    # ports:
+    #   - "9000:9000"
+
+  # Add monitoring with Prometheus/Grafana (optional)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - prometheus_data:/prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #   networks:
+  #     - proxy-network
+
+# Additional volumes
+# volumes:
+#   prometheus_data:

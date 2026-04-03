@@ -1,0 +1,40 @@
+# Data directories (contain sensitive info)
+data/
+!data/npm/custom_locations/
+!data/authentik/custom-templates/
+
+# Environment files
+.env
+!.env.example
+
+# Backup files
+*.tar.gz
+*.zip
+*.backup*
+
+# Logs
+*.log
+
+# Docker
+.docker/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Override files (should be created locally)
+docker-compose.override.yml
+
+# Deploy keys (private key - never commit!)
+.github/deploy_key
+*.pem
+*.key
+!*.key.pub
+!*.crt

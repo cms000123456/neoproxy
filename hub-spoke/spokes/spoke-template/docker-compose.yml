@@ -1,0 +1,80 @@
+version: "3.8"
+
+# SPOKE CONFIGURATION
+# Copy this template and customize for each remote host
+# - Nebula client (connects to hub)
+# - Your applications (no ports exposed!)
+
+services:
+  # Nebula VPN Client
+  nebula:
+    image: ghcr.io/slackhq/nebula:latest
+    container_name: nebula
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./nebula:/config:ro
+    command: -config /config/config.yml
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      - nebula-net
+      - app-network
+    # This allows nebula to route traffic to app network
+    # The hub will see routes for this subnet via the VPN
+
+  # EXAMPLE: Replace with your applications
+  # Each container gets an IP in the app-network subnet
+  # These IPs are reachable from the hub through Nebula
+
+  whoami:
+    image: traefik/whoami:latest
+    container_name: whoami
+    restart: unless-stopped
+    environment:
+      - WHOAMI_NAME=spoke-host
+    networks:
+      - app-network
+    # NO 'ports:' section - not exposed publicly!
+    # Accessible only via VPN at: http://<container-ip>:80
+
+  # Example: Multiple services using same ports as other spokes
+  # webapp:
+  #   image: nginx:alpine
+  #   container_name: webapp
+  #   networks:
+  #     - app-network
+  #   # Accessible at http://<ip>:80
+
+  # database:
+  #   image: postgres:16
+  #   container_name: postgres
+  #   environment:
+  #     POSTGRES_PASSWORD: secret
+  #   networks:
+  #     - app-network
+  #   # Accessible at http://<ip>:5432 from hub only!
+
+networks:
+  # Application network - ISOLATED per spoke
+  # Each spoke should use a unique subnet:
+  # - Spoke 1: 172.20.0.0/16
+  # - Spoke 2: 172.21.0.0/16
+  # - Spoke 3: 172.22.0.0/16
+  # etc.
+  app-network:
+    name: app-network
+    driver: bridge
+    ipam:
+      config:
+        # CHANGE THIS for each spoke!
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+  # Nebula network - connects to hub
+  nebula-net:
+    name: nebula-net
+    driver: bridge

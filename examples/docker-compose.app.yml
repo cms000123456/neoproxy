@@ -1,0 +1,66 @@
+# Example: Protected Application
+# This shows how to add an application behind the NeoProxy stack
+
+version: "3.8"
+
+services:
+  # Example: Jellyfin Media Server
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    # No ports exposed - access only through NPM proxy
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - /path/to/media:/media:ro
+    networks:
+      - proxy-network
+    # Use the same network as NeoProxy
+
+  # Example: Nextcloud
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    environment:
+      - MYSQL_PASSWORD=nextcloud_db_password
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_HOST=nextcloud-db
+    volumes:
+      - ./nextcloud/data:/var/www/html
+    networks:
+      - proxy-network
+    depends_on:
+      - nextcloud-db
+
+  nextcloud-db:
+    image: mariadb:latest
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_PASSWORD=nextcloud_db_password
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+    volumes:
+      - ./nextcloud/db:/var/lib/mysql
+    networks:
+      - proxy-network
+
+  # Example: Simple whoami for testing
+  whoami:
+    image: traefik/whoami:latest
+    container_name: whoami
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
+    name: proxy-network

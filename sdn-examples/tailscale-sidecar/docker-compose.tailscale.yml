@@ -1,0 +1,79 @@
+# Tailscale Sidecar Integration for NeoProxy
+# Add this to your main docker-compose.yml or use as reference
+
+version: "3.8"
+
+services:
+  # Existing NPM service - no changes needed
+  npm:
+    # ... your existing npm config
+    networks:
+      - proxy-network
+      - tailscale-net  # Optional: direct tailscale access
+
+  # Existing Authentik services...
+  authentik-server:
+    # ... config
+    networks:
+      - proxy-network
+      - tailscale-net
+
+  # Tailscale sidecar - add this to connect multiple hosts
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN      # Required for VPN
+      - NET_RAW        # Required for raw sockets
+    devices:
+      - /dev/net/tun:/dev/net/tun  # TUN device for VPN
+    volumes:
+      - ./tailscale/state:/var/lib/tailscale  # Persist state
+      # - ./tailscale/config:/config  # Optional config
+    environment:
+      # Required: Get from tailscale.com admin console
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      
+      # Hostname in tailscale network
+      - TS_HOSTNAME=${TS_HOSTNAME:-docker-host}
+      
+      # State directory
+      - TS_STATE_DIR=/var/lib/tailscale
+      
+      # Optional: Advertise Docker network routes
+      # This makes the entire Docker network accessible via Tailscale
+      # - TS_ROUTES=172.20.0.0/16,172.21.0.0/16
+      
+      # Optional: Enable exit node (route all traffic through this host)
+      # - TS_EXIT_NODE=true
+      
+      # Optional: Tags for ACLs
+      # - TS_TAGS=tag:docker,tag:proxy
+      
+      # Optional: Auth once, stay logged in
+      - TS_AUTH_ONCE=true
+      
+    networks:
+      - tailscale-net
+      - proxy-network  # Join proxy network for container access
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  proxy-network:
+    name: proxy-network
+    driver: bridge
+    
+  tailscale-net:
+    name: tailscale-net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
