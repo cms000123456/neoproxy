@@ -1,0 +1,120 @@
+version: "3.8"
+
+# Uptime Kuma - High Availability Monitoring
+# Add this to your HA docker-compose or use standalone
+
+services:
+  kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: kuma
+    restart: unless-stopped
+    # Use host network for ping monitoring, or expose port
+    # network_mode: host
+    ports:
+      - "3001:3001"
+    volumes:
+      # Use shared storage for HA
+      # All controllers mount the same path
+      - ${SHARED_DATA_PATH:-./data}/kuma:/app/data
+    environment:
+      # Optional: Use PostgreSQL instead of SQLite
+      # UPTIME_KUMA_DB_TYPE: postgres
+      # UPTIME_KUMA_DB_HOSTNAME: postgresql
+      # UPTIME_KUMA_DB_PORT: 5432
+      # UPTIME_KUMA_DB_NAME: kuma
+      # UPTIME_KUMA_DB_USERNAME: kuma
+      # UPTIME_KUMA_DB_PASSWORD: ${KUMA_DB_PASS:-changeme}
+      
+      # Optional: Bind to specific interface
+      # UPTIME_KUMA_HOST: 0.0.0.0
+      # UPTIME_KUMA_PORT: 3001
+    networks:
+      - proxy-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Optional: Kuma with PostgreSQL backend (better for HA)
+  kuma-postgres:
+    image: louislam/uptime-kuma:latest
+    container_name: kuma-postgres
+    restart: unless-stopped
+    profiles:
+      - postgres
+    ports:
+      - "3001:3001"
+    volumes:
+      # Only for uploads/attachments, DB is PostgreSQL
+      - ${SHARED_DATA_PATH:-./data}/kuma-uploads:/app/data/upload
+    environment:
+      UPTIME_KUMA_DB_TYPE: postgres
+      UPTIME_KUMA_DB_HOSTNAME: kuma-db
+      UPTIME_KUMA_DB_PORT: 5432
+      UPTIME_KUMA_DB_NAME: kuma
+      UPTIME_KUMA_DB_USERNAME: kuma
+      UPTIME_KUMA_DB_PASSWORD: ${KUMA_DB_PASS:-changeme}
+    networks:
+      - proxy-network
+      - kuma-db
+    depends_on:
+      - kuma-db
+
+  # PostgreSQL for Kuma (when using postgres profile)
+  kuma-db:
+    image: postgres:16-alpine
+    container_name: kuma-db
+    restart: unless-stopped
+    profiles:
+      - postgres
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/kuma-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: kuma
+      POSTGRES_USER: kuma
+      POSTGRES_PASSWORD: ${KUMA_DB_PASS:-changeme}
+    networks:
+      - kuma-db
+
+  # Kuma backup sidecar (automated backups)
+  kuma-backup:
+    image: offen/docker-volume-backup:latest
+    container_name: kuma-backup
+    restart: unless-stopped
+    profiles:
+      - backup
+    volumes:
+      - ${SHARED_DATA_PATH:-./data}/kuma:/backup/kuma:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./backups:/archive
+    environment:
+      BACKUP_CRON_EXPRESSION: "0 2 * * *"  # Daily at 2 AM
+      BACKUP_RETENTION_DAYS: "30"
+      BACKUP_FILENAME: kuma-backup-%Y%m%d-%H%M%S.tar.gz
+      BACKUP_ARCHIVE: /archive
+      BACKUP_STOP_CONTAINER_LABEL: kuma.stop-during-backup=true
+      # Optional: S3 upload
+      # AWS_S3_BUCKET_NAME: my-backups
+      # AWS_ACCESS_KEY_ID: xxx
+      # AWS_SECRET_ACCESS_KEY: xxx
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    name: proxy-network
+    external: true
+  kuma-db:
+    name: kuma-db
+    driver: bridge

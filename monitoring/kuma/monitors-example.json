@@ -1,0 +1,114 @@
+{
+  "version": "1.0",
+  "description": "Example Kuma monitors for NeoProxy infrastructure",
+  "monitors": [
+    {
+      "name": "NPM Admin",
+      "type": "http",
+      "url": "http://npm:81",
+      "interval": 60,
+      "retry": 3,
+      "timeout": 30,
+      "resendInterval": 0,
+      "notificationIDList": [],
+      "ignoreTls": false,
+      "accepted_statuscodes": ["200-299"]
+    },
+    {
+      "name": "NPM Public Site",
+      "type": "http",
+      "url": "https://yourdomain.com",
+      "interval": 60,
+      "retry": 3,
+      "timeout": 30,
+      "resendInterval": 0,
+      "notificationIDList": [],
+      "ignoreTls": false,
+      "accepted_statuscodes": ["200-299"]
+    },
+    {
+      "name": "Authentik Health",
+      "type": "http",
+      "url": "http://authentik-server:9000/-/health/",
+      "interval": 30,
+      "retry": 3,
+      "timeout": 10,
+      "resendInterval": 0,
+      "notificationIDList": [],
+      "ignoreTls": true,
+      "accepted_statuscodes": ["200-299"]
+    },
+    {
+      "name": "VPN Hub",
+      "type": "ping",
+      "hostname": "10.8.0.1",
+      "interval": 30,
+      "retry": 3,
+      "timeout": 10
+    },
+    {
+      "name": "Spoke 1 Gateway",
+      "type": "ping",
+      "hostname": "172.20.0.1",
+      "interval": 60,
+      "retry": 3,
+      "timeout": 10
+    },
+    {
+      "name": "Spoke 1 App",
+      "type": "ping",
+      "hostname": "172.20.0.2",
+      "interval": 60,
+      "retry": 3,
+      "timeout": 10
+    },
+    {
+      "name": "Spoke 2 Gateway",
+      "type": "ping",
+      "hostname": "172.21.0.1",
+      "interval": 60,
+      "retry": 3,
+      "timeout": 10
+    },
+    {
+      "name": "DNS Resolution",
+      "type": "dns",
+      "hostname": "yourdomain.com",
+      "dns_resolve_server": "8.8.8.8",
+      "interval": 300,
+      "retry": 3,
+      "timeout": 10
+    },
+    {
+      "name": "SSL Certificate Expiry",
+      "type": "http",
+      "url": "https://yourdomain.com",
+      "interval": 3600,
+      "retry": 1,
+      "timeout": 30,
+      "resendInterval": 0,
+      "notificationIDList": [],
+      "ignoreTls": false,
+      "accepted_statuscodes": ["200-299"],
+      "maxretries": 1,
+      "expiryNotification": true
+    }
+  ],
+  "notificationProviders": [
+    {
+      "name": "Slack Alerts",
+      "type": "slack",
+      "webhookUrl": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    },
+    {
+      "name": "Email Alerts",
+      "type": "smtp",
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUsername": "alerts@yourdomain.com",
+      "smtpPassword": "app_password",
+      "smtpFrom": "Kuma <alerts@yourdomain.com>",
+      "smtpTo": "admin@yourdomain.com"
+    }
+  ]
+}
